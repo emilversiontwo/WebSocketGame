@@ -39,11 +39,28 @@ func (ws *WebSocketServer) Reader(conn *websocket.Conn) {
 			var payload message.MovePayload
 			DecodePayload(msg.Payload, &payload)
 			// обновляем координаты
+			if _, ok := ws.game.Players[payload.UUID]; ok {
+				ws.game.Players[payload.UUID].PosX += payload.X
+				ws.game.Players[payload.UUID].PosY += payload.Y
+				// Сообщаем всем, что игрок двигрался
+				msg := message.Message{
+					Type: "player_moved",
+					Payload: map[string]interface{}{
+						"uuid": ws.game.Players[payload.UUID].UUID,
+						"x":    ws.game.Players[payload.UUID].PosX,
+						"y":    ws.game.Players[payload.UUID].PosY,
+					},
+				}
+				ws.game.Broadcast <- msg
+			}
 			// отправляем другим игрокам
 		case "chat":
 			var payload message.ChatPayload
 			DecodePayload(msg.Payload, &payload)
-			// отправляем другим игрокам
+			ws.game.Broadcast <- message.Message{
+				Type:    "chat",
+				Payload: payload,
+			}
 		case "leave":
 			var payload message.LeavePayload
 			DecodePayload(msg.Payload, &payload)

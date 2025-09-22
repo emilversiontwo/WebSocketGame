@@ -7,8 +7,9 @@ type Message struct {
 
 // Когда игрок двигается
 type MovePayload struct {
-	X float32 `json:"x"`
-	Y float32 `json:"y"`
+	UUID string  `json:"uuid"`
+	X    float32 `json:"x"`
+	Y    float32 `json:"y"`
 }
 
 // Когда игрок присоединяется

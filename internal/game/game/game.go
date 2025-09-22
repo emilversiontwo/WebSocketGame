@@ -41,20 +41,19 @@ func (g *Game) Run() {
 			g.Broadcast <- msg
 
 		case OldPlayer := <-g.Unregister:
-			if _, ok := g.Players[OldPlayer]; ok {
-				
+			if pl, ok := g.Players[OldPlayer]; ok {
+				go delete(g.Players, pl.UUID)
+				// Сообщаем всем, что новый игрок вышел
+				msg := message.Message{
+					Type: "player_destroyed",
+					Payload: map[string]interface{}{
+						"uuid": pl.UUID,
+						"x":    pl.PosX,
+						"y":    pl.PosY,
+					},
+				}
+				g.Broadcast <- msg
 			}
-			go delete(g.Players, OldPlayer.UUID)
-			// Сообщаем всем, что новый игрок вышел
-			msg := message.Message{
-				Type: "player_destroyed",
-				Payload: map[string]interface{}{
-					"uuid": OldPlayer.UUID,
-					"x":    OldPlayer.PosX,
-					"y":    OldPlayer.PosY,
-				},
-			}
-			g.Broadcast <- msg
 
 		case msg := <-g.Broadcast:
 			for uuid, p := range g.Players {
@@ -63,7 +62,7 @@ func (g *Game) Run() {
 						log.Println("write error:", err)
 						pl.Conn.Close()
 						// помечаем на удаление
-						g.Unregister <- pl
+						g.Unregister <- pl.UUID
 					}
 				}(uuid, p)
 			}
