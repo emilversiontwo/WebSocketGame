@@ -1,0 +1,31 @@
+services:
+  client:
+    container_name: vue
+    build:
+      dockerfile: client/docker/Dockerfile
+      context: .
+    user: "node"
+    working_dir: /home/node/app
+    volumes:
+      - ./client:/home/node/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NO_PROXY=localhost,127.0.0.1,meilisearch,database,adminer,queue,reverb,*.local,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+      - no_proxy=localhost,127.0.0.1,meilisearch,database,adminer,queue,reverb,*.local,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+    command: npm run dev
+
+  server:
+    container_name: golang
+    build:
+      dockerfile: server/docker/Dockerfile
+      context: .
+    working_dir: /usr/src/app
+    volumes:
+      - ./server:/usr/src/app
+    ports:
+      - "8080:8080"
+    environment:
+      - NO_PROXY=localhost,127.0.0.1,meilisearch,database,adminer,queue,reverb,*.local,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+      - no_proxy=localhost,127.0.0.1,meilisearch,database,adminer,queue,reverb,*.local,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+    command: go run cmd/server/main.go
