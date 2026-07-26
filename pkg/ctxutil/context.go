@@ -1,0 +1,14 @@
+package ctxutil
+
+import (
+	"context"
+	"main/pkg/logger"
+)
+
+func WithUserID(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, logger.UserIdKey, userID)
+}
+
+func WithLocale(ctx context.Context, locale string) context.Context {
+	return context.WithValue(ctx, logger.LocaleKey, locale)
+}
