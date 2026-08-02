@@ -13,7 +13,7 @@ func NewPlayState() *PlayState {
 	return &PlayState{}
 }
 
-func (p *PlayState) Update(g *Game) error {
+func (p *PlayState) Update(g *Game) {
 	//TODO implement me
 	panic("implement me")
 }

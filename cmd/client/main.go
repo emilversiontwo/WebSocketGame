@@ -20,7 +20,12 @@ func main() {
 	ebiten.SetWindowTitle("WSG")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
-	g := game.NewGame(ctx, 800, 600)
+	g, err := game.NewGame(ctx, 800, 600)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to initialize Game")
+		panic(err)
+	}
+	defer g.Cancel()
 
 	if err := ebiten.RunGame(g); err != nil {
 		slog.ErrorContext(ctx, "Client stopped with error", "err", err)

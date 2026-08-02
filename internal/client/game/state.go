@@ -6,27 +6,38 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+type StateKey string
+
+const (
+	StateMenuKey     StateKey = "menu"
+	StatePlayKey     StateKey = "play"
+	StateSettingsKey StateKey = "settings"
+)
+
+var registry = map[StateKey]State{
+	StateMenuKey:     NewMenuState(),
+	StatePlayKey:     NewPlayState(),
+	StateSettingsKey: NewSettingsState(),
+}
+
 type State interface {
-	Update(g *Game) error
+	Update(g *Game)
 	Draw(g *Game, screen *ebiten.Image)
 	OnEnter(ctx context.Context, g *Game)
 	OnExit(ctx context.Context, g *Game)
 }
 
 type StateManager struct {
-	states map[string]State
+	states map[StateKey]State
 }
 
 func NewStateManager() *StateManager {
 	return &StateManager{
-		states: map[string]State{
-			"menu":     NewMenuState(),
-			"play":     NewPlayState(),
-			"settings": NewSettingsState(),
-		},
+		states: registry,
 	}
 }
 
-func (s *StateManager) Get(name string) State {
-	return s.states[name]
+func (s *StateManager) Get(name StateKey) (State, bool) {
+	st, ok := s.states[name]
+	return st, ok
 }

@@ -9,7 +9,7 @@ type contextKey string
 
 const (
 	UserIdKey contextKey = "user_id"
-	LocaleKey contextKey = "locale"
+	LocaleKey contextKey = "locale" // TODO: будет вырезан SEE TO ctxutil.context
 )
 
 func InitClient(level slog.Level, version string, appName string) {

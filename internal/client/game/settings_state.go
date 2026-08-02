@@ -3,9 +3,10 @@ package game
 import (
 	"context"
 	"fmt"
-	"image/color"
+	"main/internal/client/game/settings"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -14,14 +15,13 @@ type SettingsItem struct {
 	Label       string
 	IsInput     bool
 	SettingName string
-	OnClick     func(s *SettingsState, g *Game)
+	OnClick     func(item SettingsItem, s *SettingsState, g *Game)
 }
 
 type SettingsState struct {
 	items         []SettingsItem
 	settingsCache map[string]any
 	selectedIdx   int
-	inputCooldown int
 	typeMode      bool
 	text          string
 	runes         []rune
@@ -34,45 +34,51 @@ func NewSettingsState() *SettingsState {
 		{
 			Label:       "Change Name",
 			IsInput:     true,
-			SettingName: "PlayerName",
-			OnClick: func(s *SettingsState, g *Game) {
+			SettingName: string(settings.KeyPlayerName),
+			OnClick: func(item SettingsItem, s *SettingsState, g *Game) {
 				s.typeMode = true
-				s.text = s.settingsCache["PlayerName"].(string)
+				s.text = s.settingsCache[item.SettingName].(string)
 			},
 		},
 		{
 			Label:       "Change Color",
 			IsInput:     true,
-			SettingName: "PlayerColor",
-			OnClick: func(s *SettingsState, g *Game) {
+			SettingName: string(settings.KeyPlayerColor),
+			OnClick: func(item SettingsItem, s *SettingsState, g *Game) {
 				s.typeMode = true
-				s.text = s.settingsCache["PlayerColor"].(string)
+				s.text = s.settingsCache[item.SettingName].(string)
 			},
 		},
 		{
 			Label:       "Change Language",
 			IsInput:     true,
-			SettingName: "Locale",
-			OnClick: func(s *SettingsState, g *Game) {
-				if s.settingsCache["Locale"].(string) == "ru_RU" {
-					s.settingsCache["Locale"] = "en_US"
+			SettingName: string(settings.KeyLocale),
+			OnClick: func(item SettingsItem, s *SettingsState, g *Game) {
+				if s.settingsCache[item.SettingName].(string) == "ru_RU" {
+					s.settingsCache[item.SettingName] = "en_US"
 					return
 				}
-				s.settingsCache["Locale"] = "ru_RU"
+				s.settingsCache[item.SettingName] = "ru_RU"
 			},
 		},
 		{
 			Label:   "Save and Back",
 			IsInput: false,
-			OnClick: func(s *SettingsState, g *Game) {
-				g.ChangeState("menu")
+			OnClick: func(item SettingsItem, s *SettingsState, g *Game) {
+				if err := g.ChangeState(g.ctx, StateMenuKey); err != nil {
+					g.Cancel()
+				}
 			},
 		},
 		{
 			Label:   "Restore",
 			IsInput: false,
-			OnClick: func(s *SettingsState, g *Game) {
-				s.settingsCache = g.Settings.GetSettingsMap(nil)
+			OnClick: func(item SettingsItem, s *SettingsState, g *Game) {
+				settingsMap, err := g.settings.ToMap(g.ctx)
+				if err != nil {
+					g.Cancel()
+				}
+				s.settingsCache = settingsMap
 			},
 		},
 	}
@@ -80,79 +86,63 @@ func NewSettingsState() *SettingsState {
 	return s
 }
 
-func (s *SettingsState) Update(g *Game) error {
-	if s.inputCooldown > 0 {
-		s.inputCooldown--
+func (s *SettingsState) Update(g *Game) {
+	if s.typeMode {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+			s.typeMode = false
+			s.settingsCache[s.items[s.selectedIdx].SettingName] = s.text
+		}
+
+		s.runes = ebiten.AppendInputChars(s.runes[:0])
+		s.text += string(s.runes)
+
+		if inpututil.IsKeyJustPressed(ebiten.KeyBackspace) {
+			if len(s.text) >= 1 {
+				s.text = s.text[:len(s.text)-1]
+			}
+		}
 	} else {
-		if s.typeMode {
-			if ebiten.IsKeyPressed(ebiten.KeyEnter) {
-				s.typeMode = false
-				s.inputCooldown = InputCooldown + 5
-				s.settingsCache[s.items[s.selectedIdx].SettingName] = s.text
+		if inpututil.IsKeyJustPressed(ebiten.KeyUp) || inpututil.IsKeyJustPressed(ebiten.KeyW) {
+			s.selectedIdx--
+			if s.selectedIdx < 0 {
+				s.selectedIdx = len(s.items) - 1
 			}
+		}
 
-			s.runes = ebiten.AppendInputChars(s.runes[:0])
-			s.text += string(s.runes)
-
-			if ebiten.IsKeyPressed(ebiten.KeyBackspace) {
-				if len(s.text) >= 1 {
-					s.text = s.text[:len(s.text)-1]
-				}
-				s.inputCooldown = 3
+		if inpututil.IsKeyJustPressed(ebiten.KeyDown) || inpututil.IsKeyJustPressed(ebiten.KeyS) {
+			s.selectedIdx++
+			if s.selectedIdx >= len(s.items) {
+				s.selectedIdx = 0
 			}
-		} else {
-			if ebiten.IsKeyPressed(ebiten.KeyUp) || ebiten.IsKeyPressed(ebiten.KeyW) {
-				s.selectedIdx--
-				if s.selectedIdx < 0 {
-					s.selectedIdx = len(s.items) - 1
-				}
-				s.inputCooldown = InputCooldown
-			}
+		}
 
-			if ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyS) {
-				s.selectedIdx++
-				if s.selectedIdx >= len(s.items) {
-					s.selectedIdx = 0
-				}
-				s.inputCooldown = InputCooldown
-			}
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace) {
+			item := s.items[s.selectedIdx]
+			item.OnClick(item, s, g)
+		}
 
-			if ebiten.IsKeyPressed(ebiten.KeyEnter) || ebiten.IsKeyPressed(ebiten.KeySpace) {
-				s.items[s.selectedIdx].OnClick(s, g)
-				s.inputCooldown = InputCooldown + 5
-			}
-
-			if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-				g.ChangeState("menu")
+		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+			if err := g.ChangeState(g.ctx, StateMenuKey); err != nil {
+				g.Cancel()
 			}
 		}
 	}
-
-	return nil
 }
 
 func (s *SettingsState) Draw(g *Game, screen *ebiten.Image) {
-	screen.Fill(color.RGBA{R: 20, G: 20, B: 40, A: 255})
+	screen.Fill(g.assets.BackgroundColor)
 
 	textOp := &text.DrawOptions{}
-	textOp.GeoM.Translate(float64(g.ScreenWidth/2), 100)
-	textOp.ColorScale.Scale(1, 1, 1, 1) // белый
+	textOp.GeoM.Translate(float64(g.screenWidth/2), 100)
+	textOp.ColorScale.ScaleWithColor(g.assets.TextColor)
 	textOp.PrimaryAlign = text.AlignCenter
 	textOp.SecondaryAlign = text.AlignCenter
 
-	titleFace := &text.GoTextFace{
-		Source: g.Assets.Font,
-		Size:   48,
-	}
-	text.Draw(screen, "WSG", titleFace, textOp)
+	text.Draw(screen, "WSG", g.assets.TitleFace, textOp)
 
 	textOp.GeoM.Translate(0, 50)
 
-	textUnderTitleFace := &text.GoTextFace{
-		Source: g.Assets.Font,
-		Size:   24,
-	}
-	text.Draw(screen, "Settings", textUnderTitleFace, textOp)
+	text.Draw(screen, "Settings", g.assets.FontFace, textOp)
 
 	startY := 250
 	itemSpacing := 80
@@ -160,24 +150,24 @@ func (s *SettingsState) Draw(g *Game, screen *ebiten.Image) {
 	for i, item := range s.items {
 		y := startY + i*itemSpacing
 
-		textColor := color.RGBA{R: 180, G: 180, B: 180, A: 255} // серый
+		textColor := g.assets.TextColor
 		prefix := "  "
 
 		if i == s.selectedIdx {
-			textColor = color.RGBA{R: 255, G: 220, B: 100, A: 255} // золотистый
+			textColor = g.assets.SelectColor
 			prefix = "> "
 		}
 		if i == s.selectedIdx && item.IsInput && s.typeMode {
 			vector.FillRect(
 				screen,
-				float32(g.ScreenWidth/4), float32(y)-40,
+				float32(g.screenWidth/4), float32(y)-40,
 				float32(20*len(s.text)), 80,
-				color.RGBA{255, 255, 255, 255},
+				g.assets.TextColor,
 				true,
 			)
 
 			op := &text.DrawOptions{}
-			op.GeoM.Translate(float64(g.ScreenWidth/3), float64(y))
+			op.GeoM.Translate(float64(g.screenWidth/3), float64(y))
 			op.ColorScale.ScaleWithColor(textColor)
 			op.PrimaryAlign = text.AlignStart
 			op.SecondaryAlign = text.AlignCenter
@@ -186,24 +176,20 @@ func (s *SettingsState) Draw(g *Game, screen *ebiten.Image) {
 				t += "_"
 			}
 
-			text.Draw(screen, prefix+t, g.Assets.FontFace, op)
+			text.Draw(screen, prefix+t, g.assets.FontFace, op)
 		} else {
 			op := &text.DrawOptions{}
-			op.GeoM.Translate(float64(g.ScreenWidth/3), float64(y))
+			op.GeoM.Translate(float64(g.screenWidth/3), float64(y))
 			op.ColorScale.ScaleWithColor(textColor)
 			op.PrimaryAlign = text.AlignCenter
 			op.SecondaryAlign = text.AlignCenter
 
-			text.Draw(screen, prefix+item.Label, g.Assets.FontFace, op)
+			text.Draw(screen, prefix+item.Label, g.assets.FontFace, op)
 			if item.IsInput {
-				op.GeoM.Translate(float64(g.ScreenWidth/5), 0)
+				op.GeoM.Translate(float64(g.screenWidth/5), 0)
 				op.PrimaryAlign = text.AlignStart
-				textValueFace := &text.GoTextFace{
-					Source: g.Assets.Font,
-					Size:   24,
-				}
 
-				text.Draw(screen, fmt.Sprintf(" -> %v", s.settingsCache[item.SettingName]), textValueFace, op)
+				text.Draw(screen, fmt.Sprintf(" -> %v", s.settingsCache[item.SettingName]), g.assets.FontFace, op)
 			}
 		}
 	}
@@ -211,12 +197,22 @@ func (s *SettingsState) Draw(g *Game, screen *ebiten.Image) {
 
 func (s *SettingsState) OnEnter(ctx context.Context, g *Game) {
 	s.selectedIdx = 0
-	s.inputCooldown = InputCooldown
 	s.typeMode = false
 	s.text = ""
-	s.settingsCache = g.Settings.GetSettingsMap(nil)
+	settingsMap, err := g.settings.ToMap(ctx)
+	if err != nil {
+		g.Cancel()
+	}
+	s.settingsCache = settingsMap
 }
 
 func (s *SettingsState) OnExit(ctx context.Context, g *Game) {
-	g.Settings.SetSettingsFromMap(ctx, s.settingsCache)
+
+	if g.settings.SetFromMap(ctx, s.settingsCache) != nil {
+		g.Cancel()
+	}
+
+	if g.settings.Save(ctx) != nil {
+		g.Cancel()
+	}
 }
