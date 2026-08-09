@@ -26,7 +26,7 @@ func NewMenuState() *MenuState {
 			Label: "Start Game",
 			OnClick: func(g *Game) {
 				if err := g.ChangeState(g.ctx, StatePlayKey); err != nil {
-					g.Cancel()
+					g.HandleError(g.ctx, err)
 				}
 			},
 		},
@@ -34,7 +34,7 @@ func NewMenuState() *MenuState {
 			Label: "Settings",
 			OnClick: func(g *Game) {
 				if err := g.ChangeState(g.ctx, StateSettingsKey); err != nil {
-					g.Cancel()
+					g.HandleError(g.ctx, err)
 				}
 			},
 		},

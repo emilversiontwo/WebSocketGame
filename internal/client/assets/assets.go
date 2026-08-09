@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"image/color"
-	"log/slog"
 	"main/pkg/gameerr"
 
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -24,7 +23,7 @@ type Assets struct {
 	SelectColor     color.Color
 }
 
-func LoadAssets(ctx context.Context) (*Assets, gameerr.GameErrorer) {
+func LoadAssets(ctx context.Context) (*Assets, error) {
 	font, err := text.NewGoTextFaceSource(bytes.NewReader(fontBytes))
 
 	if err != nil {
@@ -32,8 +31,9 @@ func LoadAssets(ctx context.Context) (*Assets, gameerr.GameErrorer) {
 			gameerr.ErrCodeAssetsLoading,
 			"failed to load font face from assets",
 			err,
+			gameerr.SeverityFatal,
 			map[string]any{"attempt": 1},
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	return &Assets{

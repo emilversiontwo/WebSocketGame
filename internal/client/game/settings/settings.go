@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"main/pkg/gameerr"
 	"math/rand"
 	"os"
@@ -31,7 +30,7 @@ type Settings struct {
 }
 
 // Save the settings to a file.
-func (s *Settings) Save(ctx context.Context) gameerr.GameErrorer {
+func (s *Settings) Save(ctx context.Context) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -42,8 +41,9 @@ func (s *Settings) Save(ctx context.Context) gameerr.GameErrorer {
 			gameerr.ErrCodeSettingsMarshal,
 			"failed to marshal settings",
 			err,
+			gameerr.SeverityWarning,
 			nil,
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	if err = os.WriteFile(settingsFileName, data, 0644); err != nil {
@@ -51,15 +51,16 @@ func (s *Settings) Save(ctx context.Context) gameerr.GameErrorer {
 			gameerr.ErrCodeSettingsWriting,
 			"failed to write settings file",
 			err,
+			gameerr.SeverityWarning,
 			map[string]any{"filename": settingsFileName},
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	return nil
 }
 
 // SetFromMap updates settings.
-func (s *Settings) SetFromMap(ctx context.Context, settingsMap map[string]any) gameerr.GameErrorer {
+func (s *Settings) SetFromMap(ctx context.Context, settingsMap map[string]any) error {
 	if len(settingsMap) == 0 {
 		return nil
 	}
@@ -70,6 +71,7 @@ func (s *Settings) SetFromMap(ctx context.Context, settingsMap map[string]any) g
 			gameerr.ErrCodeSettingsMarshal,
 			"failed to marshal input map",
 			err,
+			gameerr.SeverityWarning,
 			nil,
 		)
 	}
@@ -84,17 +86,18 @@ func (s *Settings) SetFromMap(ctx context.Context, settingsMap map[string]any) g
 			gameerr.ErrCodeSettingsUnmarshal,
 			"failed to unmarshal settings from map (type mismatch?)",
 			err,
+			gameerr.SeverityWarning,
 			map[string]any{
 				"input": settingsMap,
 			},
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	return nil
 }
 
 // ToMap returns the current settings as a map.
-func (s *Settings) ToMap(ctx context.Context) (map[string]any, gameerr.GameErrorer) {
+func (s *Settings) ToMap(ctx context.Context) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -104,8 +107,9 @@ func (s *Settings) ToMap(ctx context.Context) (map[string]any, gameerr.GameError
 			gameerr.ErrCodeSettingsMarshal,
 			"failed to marshal input map",
 			err,
+			gameerr.SeverityWarning,
 			nil,
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	var result map[string]any
@@ -116,8 +120,9 @@ func (s *Settings) ToMap(ctx context.Context) (map[string]any, gameerr.GameError
 			gameerr.ErrCodeSettingsUnmarshal,
 			"failed to unmarshal settings from map (type mismatch?)",
 			err,
+			gameerr.SeverityWarning,
 			nil,
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
 	return result, nil
@@ -133,7 +138,7 @@ func (s *Settings) GetSingle(ctx context.Context, key SettingKey) (any, bool) {
 	return value, ok
 }
 
-func NewSettings(ctx context.Context) (*Settings, gameerr.GameErrorer) {
+func NewSettings(ctx context.Context) (*Settings, error) {
 	file, err := os.Open(settingsFileName)
 
 	if err != nil {
@@ -141,23 +146,25 @@ func NewSettings(ctx context.Context) (*Settings, gameerr.GameErrorer) {
 			gameerr.ErrCodeSettingsLoading,
 			"settings file is missing",
 			err,
+			gameerr.SeverityWarning,
 			map[string]any{
 				"filename": settingsFileName,
 				"attempt":  1,
 			},
-		).Log(ctx, slog.LevelWarn)
+		).Log(ctx)
 		return createDefaultSettings(), nil
 	}
 
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			panic(gameerr.New(
+			gameerr.New(
 				gameerr.ErrCodeSettingsClosing,
 				"settings file closing failed",
 				err,
+				gameerr.SeverityWarning,
 				nil,
-			).LogAndReturn(ctx, slog.LevelError))
+			).Log(ctx)
 		}
 	}(file)
 
@@ -168,10 +175,11 @@ func NewSettings(ctx context.Context) (*Settings, gameerr.GameErrorer) {
 			gameerr.ErrCodeSettingsReading,
 			"settings file is corrupted",
 			err,
+			gameerr.SeverityWarning,
 			map[string]any{
 				"filename": settingsFileName,
 			},
-		).Log(ctx, slog.LevelError)
+		).Log(ctx)
 		return createDefaultSettings(), nil
 	}
 

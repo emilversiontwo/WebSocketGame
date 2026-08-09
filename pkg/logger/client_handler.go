@@ -24,10 +24,6 @@ func (h *ClientLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	state := currentClientState.Load().(string)
 	r.AddAttrs(slog.String("state", state))
 
-	if v := ctx.Value(LocaleKey); v != nil {
-		r.AddAttrs(slog.String("locale", v.(string)))
-	}
-
 	if v := ctx.Value(UserIdKey); v != nil {
 		r.AddAttrs(slog.String(string(UserIdKey), v.(string)))
 	}

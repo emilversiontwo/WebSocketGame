@@ -2,8 +2,8 @@ package game
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"main/internal/client/assets"
 	"main/internal/client/game/settings"
 	"main/pkg/gameerr"
@@ -27,14 +27,12 @@ func NewGame(ctx context.Context, width, height int) (*Game, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	a, err := assets.LoadAssets(ctx)
-
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("load assets err: %w", err)
 	}
 
 	newSettings, err := settings.NewSettings(ctx)
-
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("load settings err: %w", err)
@@ -50,7 +48,7 @@ func NewGame(ctx context.Context, width, height int) (*Game, error) {
 		cancel:       cancel,
 	}
 
-	slog.InfoContext(g.ctx, "Client side game initialized")
+	logger.Info(g.ctx, "Client side game initialized")
 
 	if err := g.ChangeState(g.ctx, StateMenuKey); err != nil {
 		return nil, fmt.Errorf("set menu state fail: %w", err)
@@ -59,20 +57,21 @@ func NewGame(ctx context.Context, width, height int) (*Game, error) {
 	return g, nil
 }
 
-func (g *Game) ChangeState(ctx context.Context, state StateKey) gameerr.GameErrorer {
+func (g *Game) ChangeState(ctx context.Context, state StateKey) error {
 	next, ok := g.stateManager.Get(state)
 	if !ok {
 		return gameerr.New(
 			gameerr.ErrCodeStateUnknown,
 			"failed to change state",
 			nil,
+			gameerr.SeverityFatal,
 			map[string]any{
 				"state": state,
 			},
-		).LogAndReturn(ctx, slog.LevelError)
+		)
 	}
 
-	slog.InfoContext(ctx, "Changing game state", "new_state", state)
+	logger.Info(ctx, "Changing game state", "new_state", state)
 
 	if g.currentState != nil {
 		g.currentState.OnExit(ctx, g)
@@ -97,6 +96,28 @@ func (g *Game) WithContext(ctx context.Context) {
 		panic("nil context")
 	}
 	g.ctx = ctx
+}
+
+func (g *Game) HandleError(ctx context.Context, err error) {
+	if err == nil {
+		return
+	}
+
+	var gErr *gameerr.GameError
+
+	if errors.As(err, &gErr) {
+		switch gErr.Severity {
+		case gameerr.SeverityFatal:
+			gErr.Log(ctx)
+			g.Cancel()
+		default:
+			gErr.Log(ctx)
+		}
+
+		return
+	}
+
+	logger.Warn(ctx, "Unknown error occurred", "error", err)
 }
 
 // Cancel soft stop of the game.

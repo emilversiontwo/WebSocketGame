@@ -201,18 +201,17 @@ func (s *SettingsState) OnEnter(ctx context.Context, g *Game) {
 	s.text = ""
 	settingsMap, err := g.settings.ToMap(ctx)
 	if err != nil {
-		g.Cancel()
+		g.HandleError(ctx, err)
 	}
 	s.settingsCache = settingsMap
 }
 
 func (s *SettingsState) OnExit(ctx context.Context, g *Game) {
-
-	if g.settings.SetFromMap(ctx, s.settingsCache) != nil {
-		g.Cancel()
+	if err := g.settings.SetFromMap(ctx, s.settingsCache); err != nil {
+		g.HandleError(ctx, err)
 	}
 
-	if g.settings.Save(ctx) != nil {
-		g.Cancel()
+	if err := g.settings.Save(ctx); err != nil {
+		g.HandleError(ctx, err)
 	}
 }

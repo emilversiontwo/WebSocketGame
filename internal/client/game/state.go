@@ -14,10 +14,14 @@ const (
 	StateSettingsKey StateKey = "settings"
 )
 
-var registry = map[StateKey]State{
-	StateMenuKey:     NewMenuState(),
-	StatePlayKey:     NewPlayState(),
-	StateSettingsKey: NewSettingsState(),
+func NewStateManager() *StateManager {
+	return &StateManager{
+		states: map[StateKey]State{
+			StateMenuKey:     NewMenuState(),
+			StatePlayKey:     NewPlayState(),
+			StateSettingsKey: NewSettingsState(),
+		},
+	}
 }
 
 type State interface {
@@ -29,12 +33,6 @@ type State interface {
 
 type StateManager struct {
 	states map[StateKey]State
-}
-
-func NewStateManager() *StateManager {
-	return &StateManager{
-		states: registry,
-	}
 }
 
 func (s *StateManager) Get(name StateKey) (State, bool) {

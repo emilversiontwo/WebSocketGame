@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"main/pkg/logger"
 )
 
 // ErrorCode Паттерн именования: ErrCode<Домен><Проблема> или просто <ДОМЕН>_<ПРОБЛЕМА>
@@ -17,26 +18,27 @@ const (
 
 	ErrCodeSettingsMarshal   ErrorCode = "ERR_SETTINGS_MARSHAL"
 	ErrCodeSettingsUnmarshal ErrorCode = "ERR_SETTINGS_UNMARSHAL"
-	ErrCodeSettingsWriting   ErrorCode = "ERR_SETTINGS_WRITEING"
+	ErrCodeSettingsWriting   ErrorCode = "ERR_SETTINGS_WRITING"
 	ErrCodeSettingsReading   ErrorCode = "ERR_SETTINGS_READING"
 	ErrCodeSettingsLoading   ErrorCode = "ERR_SETTINGS_LOADING"
 	ErrCodeSettingsClosing   ErrorCode = "ERR_SETTINGS_CLOSING"
 )
 
+type ErrorSeverity int8
+
+const (
+	SeverityInfo    ErrorSeverity = 1
+	SeverityWarning ErrorSeverity = 2
+	SeverityFatal   ErrorSeverity = 3
+)
+
 // GameError - кастомная ошибка для игровой логики.
 type GameError struct {
-	Code    ErrorCode      // Уникальный код ошибки, например: "ERR_ASSET_NOT_FOUND"
-	Message string         // Человекочитаемое описание того, что пошло не так на этом уровне
-	Err     error          // Оригинальная ошибка, которую мы оборачиваем (может быть nil)
-	Meta    map[string]any // Дополнительные контекстные данные (имя файла, ID игрока и т.д.)
-}
-
-type GameErrorer interface {
-	Error() string
-	Unwrap() error
-	LogAndReturn(ctx context.Context, level slog.Level) GameErrorer
-	Log(ctx context.Context, level slog.Level)
-	slog.LogValuer
+	Code     ErrorCode
+	Message  string
+	Err      error
+	Meta     map[string]any
+	Severity ErrorSeverity
 }
 
 func (e *GameError) Error() string {
@@ -66,22 +68,23 @@ func (e *GameError) LogValue() slog.Value {
 	return slog.GroupValue(attrs...)
 }
 
-func New(code ErrorCode, msg string, err error, meta map[string]any) GameErrorer {
+func New(code ErrorCode, msg string, err error, serv ErrorSeverity, meta map[string]any) *GameError {
 	return &GameError{
-		Code:    code,
-		Message: msg,
-		Err:     err,
-		Meta:    meta,
+		Code:     code,
+		Message:  msg,
+		Err:      err,
+		Severity: serv,
+		Meta:     meta,
 	}
 }
 
-func (e *GameError) LogAndReturn(ctx context.Context, level slog.Level) GameErrorer {
-	e.Log(ctx, level)
-	return e
-}
-
-func (e *GameError) Log(ctx context.Context, level slog.Level) {
-	slog.LogAttrs(ctx, level, e.Message,
-		slog.Any("error_details", e), // вызов LogValue()
-	)
+func (e *GameError) Log(ctx context.Context) {
+	switch e.Severity {
+	case SeverityInfo:
+		logger.Info(ctx, e.Message, e.LogValue())
+	case SeverityWarning:
+		logger.Warn(ctx, e.Message, e.LogValue())
+	case SeverityFatal:
+		logger.Error(ctx, e.Message, e.LogValue())
+	}
 }

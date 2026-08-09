@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"main/internal/client/game"
 	"main/pkg/logger"
+	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -14,7 +15,7 @@ func main() {
 
 	ctx := context.Background()
 
-	slog.InfoContext(ctx, "Starting Client")
+	logger.Error(ctx, "Starting Client")
 
 	ebiten.SetWindowSize(800, 600)
 	ebiten.SetWindowTitle("WSG")
@@ -22,12 +23,12 @@ func main() {
 
 	g, err := game.NewGame(ctx, 800, 600)
 	if err != nil {
-		slog.ErrorContext(ctx, "Failed to initialize Game")
-		panic(err)
+		logger.Error(ctx, "Failed to initialize Game", "error", err)
+		os.Exit(1)
 	}
 	defer g.Cancel()
 
 	if err := ebiten.RunGame(g); err != nil {
-		slog.ErrorContext(ctx, "Client stopped with error", "err", err)
+		logger.Error(ctx, "Client stopped with error", "err", err)
 	}
 }
